@@ -49,28 +49,31 @@
       await signOut(auth);
     };
 
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        if (!allowedEmails.includes(user.email)) {
-          signOut(auth);
-          accessDeniedMsg.style.display = "block";
-          return;
-        }
+   onAuthStateChanged(auth, (user) => {
+  if (user) {
+    console.log("Signed in as:", user.email);  // 👈 Add this
 
-        currentUser = user;
-        accessDeniedMsg.style.display = "none";
-        loginBtn.style.display = "none";
-        logoutBtn.style.display = "inline-block";
-        taskForm.style.display = "block";
-        loadTasks();
-      } else {
-        currentUser = null;
-        loginBtn.style.display = "inline-block";
-        logoutBtn.style.display = "none";
-        taskForm.style.display = "none";
-        clearColumns();
-      }
-    });
+    if (!allowedEmails.includes(user.email)) {
+      signOut(auth);
+      accessDeniedMsg.style.display = "block";
+      return;
+    }
+
+    currentUser = user;
+    accessDeniedMsg.style.display = "none";
+    loginBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+    taskForm.style.display = "block";
+    loadTasks();
+  } else {
+    currentUser = null;
+    loginBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+    taskForm.style.display = "none";
+    clearColumns();
+  }
+});
+
 
     function clearColumns() {
       ["backlog", "inprogress", "done"].forEach(id => {

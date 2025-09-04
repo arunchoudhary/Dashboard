@@ -14,7 +14,7 @@
     .add-task { text-align: center; margin-bottom: 10px; }
     input, select, button { margin: 5px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 90%; max-width: 300px; box-sizing: border-box; }
     #loginBtn, #logoutBtn { margin: 10px; padding: 10px 20px; }
-    #accessDenied { color: red; text-align: center; font-weight: bold; display: none; margin-top: 20px; }
+    #accessDenied { color: red; text-align: center; font-weight:bold; display:none; margin-top:20px; }
     #userDisplay { text-align:center; font-weight:bold; margin:10px 0; word-break: break-word; }
 
     @media (max-width: 768px) {
@@ -36,7 +36,7 @@
   <button id="loginBtn">Sign in with Google</button>
   <button id="logoutBtn" style="display:none;">Logout</button>
   <div id="userDisplay"></div>
-  <div id="accessDenied">🚫 Access Denied: You are not authorized to use this dashboard.</div>
+  <div id="accessDenied">🚫 Access Denied by Firebase security rules.</div>
 
   <div class="add-task" id="taskForm" style="display:none;">
     <input type="text" id="taskInput" placeholder="Enter new task..." />
@@ -64,10 +64,8 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const allowedEmails = ["your.email@example.com"]; // replace with authorized emails
     let currentUser = null;
 
-    // DOM elements
     const loginBtn = document.getElementById("loginBtn");
     const logoutBtn = document.getElementById("logoutBtn");
     const taskForm = document.getElementById("taskForm");
@@ -76,41 +74,26 @@
     const accessDeniedMsg = document.getElementById("accessDenied");
     const userDisplay = document.getElementById("userDisplay");
 
-    // Login / Logout
     loginBtn.onclick = async () => {
       const provider = new GoogleAuthProvider();
       try { await signInWithPopup(auth, provider); } 
       catch (error) { console.error(error); alert("Google Sign-In failed."); }
     };
+
     logoutBtn.onclick = async () => { await signOut(auth); };
 
-    // Auth listener
     onAuthStateChanged(auth, (user) => {
       if (user) {
-        const normalizedAllowed = allowedEmails.map(e => e.toLowerCase().trim());
-        const normalizedUser = user.email.toLowerCase().trim();
-
-        if (!normalizedAllowed.includes(normalizedUser)) {
-          accessDeniedMsg.style.display = "block";
-          loginBtn.disabled = true;
-          taskForm.style.display = "none";
-          userDisplay.textContent = `Signed in as: ${user.email} (unauthorized)`;
-          logoutBtn.style.display = "inline-block";
-          return;
-        }
-
         currentUser = user;
-        accessDeniedMsg.style.display = "none";
         loginBtn.style.display = "none";
         logoutBtn.style.display = "inline-block";
-        loginBtn.disabled = false;
         taskForm.style.display = "block";
         userDisplay.textContent = `Welcome, ${user.displayName || user.email}`;
+        accessDeniedMsg.style.display = "none";
         loadTasks();
       } else {
         currentUser = null;
         loginBtn.style.display = "inline-block";
-        loginBtn.disabled = false;
         logoutBtn.style.display = "none";
         taskForm.style.display = "none";
         userDisplay.textContent = "";
@@ -119,7 +102,7 @@
     });
 
     function clearColumns() {
-      ["backlog", "inprogress", "done"].forEach(id => {
+      ["backlog","inprogress","done"].forEach(id => {
         document.getElementById(id).innerHTML = `<h3>${id.charAt(0).toUpperCase() + id.slice(1)}</h3>`;
       });
     }
@@ -127,33 +110,49 @@
     async function loadTasks() {
       clearColumns();
       if (!currentUser) return;
-      const q = query(collection(db, "tasks"), where("uid", "==", currentUser.uid));
-      const snapshot = await getDocs(q);
-      snapshot.forEach(docSnap => {
-        const task = docSnap.data();
-        const taskElement = document.createElement("div");
-        taskElement.className = "task";
-        taskElement.innerHTML = `
-          <button class="delete-task" onclick="deleteTask('${docSnap.id}')">X</button>
-          <strong>${task.text}</strong>
-        `;
-        document.getElementById(task.status).appendChild(taskElement);
-      });
+      try {
+        const q = query(collection(db, "tasks"), where("uid", "==", currentUser.uid));
+        const snapshot = await getDocs(q);
+        snapshot.forEach(docSnap => {
+          const task = docSnap.data();
+          const taskElement = document.createElement("div");
+          taskElement.className = "task";
+          taskElement.innerHTML = `
+            <button class="delete-task" onclick="deleteTask('${docSnap.id}')">X</button>
+            <strong>${task.text}</strong>
+          `;
+          document.getElementById(task.status).appendChild(taskElement);
+        });
+      } catch (error) {
+        console.error(error);
+        accessDeniedMsg.style.display = "block";
+        taskForm.style.display = "none";
+      }
     }
 
-    window.addTask = async function () {
+    window.addTask = async function() {
       if (!currentUser) return;
       const text = taskInput.value;
       const status = statusSelect.value;
       if (!text.trim()) return;
-      await addDoc(collection(db, "tasks"), { uid: currentUser.uid, text, status });
-      taskInput.value = "";
-      loadTasks();
+      try {
+        await addDoc(collection(db,"tasks"), { uid: currentUser.uid, text, status });
+        taskInput.value = "";
+        loadTasks();
+      } catch (error) {
+        console.error(error);
+        accessDeniedMsg.style.display = "block";
+      }
     };
 
-    window.deleteTask = async function (id) {
-      await deleteDoc(doc(db, "tasks", id));
-      loadTasks();
+    window.deleteTask = async function(id) {
+      try {
+        await deleteDoc(doc(db,"tasks",id));
+        loadTasks();
+      } catch(error) {
+        console.error(error);
+        accessDeniedMsg.style.display = "block";
+      }
     };
   </script>
 </body>

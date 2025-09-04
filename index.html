@@ -14,25 +14,26 @@
       getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc 
     } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-firestore.js";
 
-    // ✅ Import Firebase config from external file
+    // ✅ Firebase config (from separate file)
     import { firebaseConfig } from "./config.js";
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // ✅ Replace with your allowed Google email(s)
-    const allowedEmails = ["abandonbrowse@gmail.com"];
+    // ✅ Allowed Google accounts
+    const allowedEmails = ["your.email@example.com"]; // replace with your email(s)
 
     let currentUser = null;
 
+    // DOM elements
     const loginBtn = document.getElementById("loginBtn");
     const logoutBtn = document.getElementById("logoutBtn");
     const taskForm = document.getElementById("taskForm");
     const taskInput = document.getElementById("taskInput");
     const statusSelect = document.getElementById("statusSelect");
     const accessDeniedMsg = document.getElementById("accessDenied");
+    const userDisplay = document.getElementById("userDisplay");
 
     // Google Sign-in
     loginBtn.onclick = async () => {
@@ -45,47 +46,59 @@
       }
     };
 
+    // Logout
     logoutBtn.onclick = async () => {
       await signOut(auth);
     };
 
-   onAuthStateChanged(auth, (user) => {
-  if (user) {
-    const normalizedAllowed = allowedEmails.map(e => e.toLowerCase().trim());
-    const normalizedUser = user.email.toLowerCase().trim();
+    // Auth state listener with UX polish
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const normalizedAllowed = allowedEmails.map(e => e.toLowerCase().trim());
+        const normalizedUser = user.email.toLowerCase().trim();
 
-    console.log("Signed in as:", user.email);
-    console.log("Allowed emails:", normalizedAllowed);
+        console.log("Signed in as:", user.email);
+        console.log("Allowed emails:", normalizedAllowed);
 
-    if (!normalizedAllowed.includes(normalizedUser)) {
-      console.warn("Access denied for:", user.email);
-      signOut(auth);
-      accessDeniedMsg.style.display = "block";
-      return;
-    }
+        if (!normalizedAllowed.includes(normalizedUser)) {
+          // Unauthorized: disable dashboard, show message
+          accessDeniedMsg.style.display = "block";
+          loginBtn.disabled = true;
+          taskForm.style.display = "none";
+          userDisplay.textContent = `Signed in as: ${user.email} (unauthorized)`;
+          logoutBtn.style.display = "inline-block";
+          return;
+        }
 
-    // ✅ Passed frontend check
-    currentUser = user;
-    accessDeniedMsg.style.display = "none";
-    loginBtn.style.display = "none";
-    logoutBtn.style.display = "inline-block";
-    taskForm.style.display = "block";
-    loadTasks();
-  } else {
-    currentUser = null;
-    loginBtn.style.display = "inline-block";
-    logoutBtn.style.display = "none";
-    taskForm.style.display = "none";
-    clearColumns();
-  }
-});
+        // ✅ Allowed user
+        currentUser = user;
+        accessDeniedMsg.style.display = "none";
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline-block";
+        loginBtn.disabled = false;
+        taskForm.style.display = "block";
+        userDisplay.textContent = `Welcome, ${user.displayName || user.email}`;
+        loadTasks();
+      } else {
+        // No user signed in
+        currentUser = null;
+        loginBtn.style.display = "inline-block";
+        loginBtn.disabled = false;
+        logoutBtn.style.display = "none";
+        taskForm.style.display = "none";
+        userDisplay.textContent = "";
+        clearColumns();
+      }
+    });
 
+    // Clear columns
     function clearColumns() {
       ["backlog", "inprogress", "done"].forEach(id => {
         document.getElementById(id).innerHTML = `<h3>${id.charAt(0).toUpperCase() + id.slice(1)}</h3>`;
       });
     }
 
+    // Load tasks
     async function loadTasks() {
       clearColumns();
       if (!currentUser) return;
@@ -105,6 +118,7 @@
       });
     }
 
+    // Add task
     window.addTask = async function () {
       const text = taskInput.value;
       const status = statusSelect.value;
@@ -120,6 +134,7 @@
       loadTasks();
     };
 
+    // Delete task
     window.deleteTask = async function (id) {
       await deleteDoc(doc(db, "tasks", id));
       loadTasks();
@@ -137,13 +152,15 @@
     input, select, button { margin: 5px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
     #loginBtn, #logoutBtn { margin: 10px; padding: 10px 20px; }
     #accessDenied { color: red; text-align: center; font-weight: bold; display: none; margin-top: 20px; }
+    #userDisplay { text-align:center; font-weight:bold; margin:10px 0; }
   </style>
 </head>
 <body>
   <h2>Task Dashboard</h2>
+
   <button id="loginBtn">Sign in with Google</button>
   <button id="logoutBtn" style="display:none;">Logout</button>
-
+  <div id="userDisplay"></div>
   <div id="accessDenied">🚫 Access Denied: You are not authorized to use this dashboard.</div>
 
   <div class="add-task" id="taskForm" style="display:none;">

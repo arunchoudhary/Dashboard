@@ -5,10 +5,133 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>To-Do Dashboard</title>
 
-  <!-- Firebase SDKs -->
-  https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js
-  https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js
-  https://www.gstatic.com/firebasejs/10.3.1/firebase-firestore.js</script>
+  <!-- Firebase v9 SDKs (Modular) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
+    import { 
+      getAuth, 
+      GoogleAuthProvider, 
+      signInWithPopup, 
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      getDocs, 
+      query, 
+      where, 
+      deleteDoc, 
+      doc 
+    } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-firestore.js";
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVCL7dAxL0N-wAuqNTpdSd2yRXKUf0cz0",
+      authDomain: "dashboard-84cb9.firebaseapp.com",
+      projectId: "dashboard-84cb9",
+      storageBucket: "dashboard-84cb9.appspot.com",
+      messagingSenderId: "1032068257985",
+      appId: "1:1032068257985:web:de6b66c067b8c8d5111c40"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+
+    // DOM elements
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const taskForm = document.getElementById("taskForm");
+    const taskInput = document.getElementById("taskInput");
+    const statusSelect = document.getElementById("statusSelect");
+
+    // Google Sign-in
+    loginBtn.onclick = async () => {
+      const provider = new GoogleAuthProvider();
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        console.error("Sign-in error:", error);
+        alert("Google Sign-In failed. Check console for details.");
+      }
+    };
+
+    // Logout
+    logoutBtn.onclick = async () => {
+      await signOut(auth);
+    };
+
+    // Auth state listener
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline-block";
+        taskForm.style.display = "block";
+        loadTasks();
+      } else {
+        currentUser = null;
+        loginBtn.style.display = "inline-block";
+        logoutBtn.style.display = "none";
+        taskForm.style.display = "none";
+        clearColumns();
+      }
+    });
+
+    // Clear board
+    function clearColumns() {
+      ["backlog", "inprogress", "done"].forEach(id => {
+        document.getElementById(id).innerHTML = `<h3>${id.charAt(0).toUpperCase() + id.slice(1)}</h3>`;
+      });
+    }
+
+    // Load tasks
+    async function loadTasks() {
+      clearColumns();
+      if (!currentUser) return;
+
+      const q = query(collection(db, "tasks"), where("uid", "==", currentUser.uid));
+      const snapshot = await getDocs(q);
+
+      snapshot.forEach((docSnap) => {
+        const task = docSnap.data();
+        const taskElement = document.createElement("div");
+        taskElement.className = "task";
+        taskElement.innerHTML = `
+          <button class="delete-task" onclick="deleteTask('${docSnap.id}')">X</button>
+          <strong>${task.text}</strong>
+        `;
+        document.getElementById(task.status).appendChild(taskElement);
+      });
+    }
+
+    // Add task
+    window.addTask = async function () {
+      const text = taskInput.value;
+      const status = statusSelect.value;
+      if (!text.trim() || !currentUser) return;
+
+      await addDoc(collection(db, "tasks"), {
+        uid: currentUser.uid,
+        text: text,
+        status: status
+      });
+
+      taskInput.value = "";
+      loadTasks();
+    };
+
+    // Delete task
+    window.deleteTask = async function (id) {
+      await deleteDoc(doc(db, "tasks", id));
+      loadTasks();
+    };
+  </script>
 
   <style>
     body { font-family: Arial; background: #f4f6f9; padding: 20px; }
@@ -42,96 +165,5 @@
     <div class="column" id="inprogress"><h3>In Progress</h3></div>
     <div class="column" id="done"><h3>Done</h3></div>
   </div>
-
-  <!-- App Logic -->
-  <script defer>
-    window.addEventListener('DOMContentLoaded', () => {
-      const firebaseConfig = {
-        apiKey: "AIzaSyDVCL7dAxL0N-wAuqNTpdSd2yRXKUf0cz0",
-        authDomain: "dashboard-84cb9.firebaseapp.com",
-        projectId: "dashboard-84cb9",
-        storageBucket: "dashboard-84cb9.appspot.com",
-        messagingSenderId: "1032068257985",
-        appId: "1:1032068257985:web:de6b66c067b8c8d5111c40"
-      };
-
-      firebase.initializeApp(firebaseConfig);
-      const auth = firebase.auth();
-      const db = firebase.firestore();
-
-      let currentUser = null;
-
-      document.getElementById('loginBtn').onclick = () => {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch(error => {
-          console.error("Sign-in error:", error);
-          alert("Google Sign-In failed. Check console for details.");
-        });
-      };
-
-      document.getElementById('logoutBtn').onclick = () => {
-        auth.signOut();
-      };
-
-      auth.onAuthStateChanged(user => {
-        if (user) {
-          currentUser = user;
-          document.getElementById('loginBtn').style.display = 'none';
-          document.getElementById('logoutBtn').style.display = 'inline-block';
-          document.getElementById('taskForm').style.display = 'block';
-          loadTasks();
-        } else {
-          currentUser = null;
-          document.getElementById('loginBtn').style.display = 'inline-block';
-          document.getElementById('logoutBtn').style.display = 'none';
-          document.getElementById('taskForm').style.display = 'none';
-          clearColumns();
-        }
-      });
-
-      function clearColumns() {
-        ['backlog', 'inprogress', 'done'].forEach(id => {
-          document.getElementById(id).innerHTML = `<h3>${id.charAt(0).toUpperCase() + id.slice(1)}</h3>`;
-        });
-      }
-
-      function loadTasks() {
-        clearColumns();
-        db.collection('tasks').where('uid', '==', currentUser.uid).get().then(snapshot => {
-          snapshot.forEach(doc => {
-            const task = doc.data();
-            const taskElement = document.createElement('div');
-            taskElement.className = 'task';
-            taskElement.innerHTML = `
-              <button class="delete-task" onclick="deleteTask('${doc.id}')">X</button>
-              <strong>${task.text}</strong>
-            `;
-            document.getElementById(task.status).appendChild(taskElement);
-          });
-        });
-      }
-
-      window.addTask = function () {
-        const text = document.getElementById('taskInput').value;
-        const status = document.getElementById('statusSelect').value;
-        if (!text.trim()) return;
-
-        db.collection('tasks').add({
-          uid: currentUser.uid,
-          text: text,
-          status: status
-        }).then(() => {
-          document.getElementById('taskInput').value = '';
-          loadTasks();
-        });
-      };
-
-      window.deleteTask = function (id) {
-        db.collection('tasks').doc(id).delete().then(() => {
-          loadTasks();
-        });
-      };
-    });
-  </script>
 </body>
 </html>

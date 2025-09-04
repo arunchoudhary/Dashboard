@@ -10,7 +10,19 @@
     .board { display: flex; justify-content: space-around; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
     .column { background: #fff; border-radius: 10px; padding: 10px; width: 30%; box-shadow: 0 2px 6px rgba(0,0,0,0.1); min-height: 200px; box-sizing: border-box; margin-bottom: 20px; }
     .task { background: #fefefe; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
-    .delete-task { background: red; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.8em; float: right; }
+    .delete-task {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 2px 6px;
+      cursor: pointer;
+      font-size: 0.8em;
+    }
+
     .add-task { text-align: center; margin-bottom: 10px; }
     input, select, button { margin: 5px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 90%; max-width: 300px; box-sizing: border-box; }
     #loginBtn, #logoutBtn { margin: 10px; padding: 10px 20px; }

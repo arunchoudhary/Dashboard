@@ -6,8 +6,9 @@
   <title>To-Do Dashboard</title>
 
   <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.3.1/firebase-app.jsscript src="https://www.gstatic.com/firebasejs/10.3.1/firebaseipt>
-  <script src="https://www.gstatic.com/firebaseebase-firestore.js</script>
+  <ttps://www.gstatic.com/firebasejs/10.3.1/firebase-app.js</script>
+  https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js</script>
+  https://www.gstatic.com/firebasejs/10.3.1/firebase-firestore.js
 
   <style>
     body { font-family: Arial; background: #f4f6f9; padding: 20px; }
@@ -60,7 +61,10 @@
 
     document.getElementById('loginBtn').onclick = () => {
       const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider);
+      auth.signInWithPopup(provider).catch(error => {
+        console.error("Sign-in error:", error);
+        alert("Google Sign-In failed. Check console for details.");
+      });
     };
 
     document.getElementById('logoutBtn').onclick = () => {

@@ -1,52 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>To-Do Dashboard</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; margin:0; }
-    h2 { text-align: center; margin-bottom: 10px; }
-    .board { display: flex; justify-content: space-around; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
-    .column { background: #fff; border-radius: 10px; padding: 10px; width: 30%; box-shadow: 0 2px 6px rgba(0,0,0,0.1); min-height: 200px; box-sizing: border-box; margin-bottom: 20px; }
-    .task { background: #fefefe; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
-    .delete-task { 
-  background: red; 
-  color: white; 
-  border: none; 
-  border-radius: 4px; 
-  padding: 2px 6px; 
-  cursor: pointer; 
-  font-size: 0.8em; 
-  float: right; 
-}
-
-    .add-task { text-align: center; margin-bottom: 10px; }
-    input, select, button { margin: 5px; padding: 8px; border-radius: 4px; border: 1px solid #ccc;  max-width: 300px; box-sizing: border-box; }
-    #loginBtn, #logoutBtn { margin: 10px; padding: 10px 20px; }
-    #accessDenied { color: red; text-align: center; font-weight:bold; display:none; margin-top:20px; }
-    #userDisplay { text-align:center; font-weight:bold; margin:10px 0; word-break: break-word; }
-
-    @media (max-width: 768px) {
-      .column { width: 100%; }
-      .board { gap: 10px; }
-      input, select, button { width: 95%; }
+    :root{
+      --card-bg:#fff;
+      --page-bg:#f4f6f9;
+      --shadow:0 2px 6px rgba(0,0,0,.08);
+      --radius:12px;
     }
-    @media (max-width: 480px) {
-      .add-task input,
-      .add-task select,
-      .add-task button { display: block; width: 95%; margin: 8px auto; }
-      #loginBtn, #logoutBtn { width: 95%; font-size: 1.1em; padding: 12px 0; }
+    *{box-sizing:border-box}
+    body{
+      font-family: Arial, sans-serif;
+      background: var(--page-bg);
+      padding: 20px; margin:0;
+    }
+    h2{ text-align:center; margin:0 0 12px }
+    .controls{
+      display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:8px;
+    }
+    .board{
+      display:flex; gap:20px; margin-top:16px; flex-wrap:wrap; align-items:flex-start;
+    }
+    .column{
+      background:var(--card-bg); border-radius:var(--radius); padding:12px;
+      width:32%; min-width:280px; flex:1 1 300px; min-height:220px; box-shadow:var(--shadow);
+      transition: background .15s ease;
+    }
+    .column.dragover{ background:#e9f7ff }
+    .column h3{ margin:4px 0 8px; font-size:1.05rem }
+    .task{
+      background:#fff; border:1px solid #e6e6e6; border-radius:10px; box-shadow:var(--shadow);
+      padding:10px 10px 8px; margin:10px 0; position:relative; cursor:grab;
+    }
+    .task:active{ cursor:grabbing }
+    .task-title{ font-weight:bold; padding-right:28px; word-break:break-word }
+    .delete-task{
+      position:absolute; top:6px; right:6px; background:#e53935; color:#fff; border:none;
+      border-radius:6px; padding:0 6px; height:20px; line-height:20px; font-size:.7em; cursor:pointer;
+    }
+    .comments { margin-top:10px; padding-left:10px; border-left:2px solid #eee }
+    .comment{ font-size:.9em; margin:4px 0; color:#333; display:flex; gap:6px; align-items:center; justify-content:space-between }
+    .delete-comment{
+      background:#c62828; color:#fff; border:none; border-radius:6px; padding:0 6px; height:18px; line-height:18px; font-size:.7em; cursor:pointer;
+      flex:0 0 auto;
+    }
+    .add-comment{ display:flex; gap:6px; margin-top:6px }
+    .add-comment input{
+      flex:1 1 auto; padding:6px 8px; border:1px solid #ccc; border-radius:8px;
+    }
+    .add-comment button{
+      border:none; background:#1976d2; color:#fff; border-radius:8px; padding:6px 10px; cursor:pointer;
+    }
+
+    .add-task{
+      display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:10px 0 6px;
+    }
+    .add-task input, .add-task select{
+      padding:8px; border:1px solid #ccc; border-radius:10px; min-width:220px;
+    }
+    .add-task button{
+      padding:8px 14px; border:none; background:#2e7d32; color:#fff; border-radius:10px; cursor:pointer;
+    }
+    #userDisplay{ text-align:center; font-weight:bold; margin:6px 0 10px; word-break:break-word }
+    #accessDenied{ display:none; color:#b00020; text-align:center; font-weight:bold; margin:8px 0 }
+
+    /* Buttons */
+    #loginBtn, #logoutBtn{
+      padding:10px 16px; border:none; border-radius:10px; cursor:pointer;
+      box-shadow:var(--shadow);
+    }
+    #loginBtn{ background:#4285f4; color:#fff }
+    #logoutBtn{ background:#ddd }
+
+    /* Mobile */
+    @media (max-width: 768px){
+      .column{ width:100% }
+      .add-task input, .add-task select, .add-task button{ width:100%; max-width:520px }
+      #loginBtn, #logoutBtn{ width:100%; max-width:520px }
     }
   </style>
 </head>
 <body>
   <h2>Task Dashboard</h2>
 
-  <button id="loginBtn">Sign in with Google</button>
-  <button id="logoutBtn" style="display:none;">Logout</button>
+  <div class="controls">
+    <button id="loginBtn">Sign in with Google</button>
+    <button id="logoutBtn" style="display:none;">Logout</button>
+  </div>
   <div id="userDisplay"></div>
-  <div id="accessDenied">🚫 Access Denied by Firebase security rules.</div>
+  <div id="accessDenied">🚫 Access denied by Firebase security rules.</div>
 
   <div class="add-task" id="taskForm" style="display:none;">
     <input type="text" id="taskInput" placeholder="Enter new task..." />
@@ -55,7 +100,7 @@
       <option value="inprogress">In Progress</option>
       <option value="done">Done</option>
     </select>
-    <button onclick="addTask()">Add Task</button>
+    <button id="addTaskBtn">Add Task</button>
   </div>
 
   <div class="board">
@@ -64,106 +109,239 @@
     <div class="column" id="done"><h3>Done</h3></div>
   </div>
 
-  <!-- Firebase App Logic -->
+  <!-- App (place at end so DOM exists) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-firestore.js";
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js";
+    import {
+      getFirestore, collection, addDoc, onSnapshot, query, where, deleteDoc, doc,
+      updateDoc, getDoc, arrayUnion
+    } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-firestore.js";
     import { firebaseConfig } from "./config.js";
 
+    // Init
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db   = getFirestore(app);
+
+    // State
     let currentUser = null;
+    let unsubscribeTasks = null;
 
-    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const taskForm = document.getElementById("taskForm");
-    const taskInput = document.getElementById("taskInput");
-    const statusSelect = document.getElementById("statusSelect");
-    const accessDeniedMsg = document.getElementById("accessDenied");
-    const userDisplay = document.getElementById("userDisplay");
+    // DOM
+    const loginBtn   = document.getElementById("loginBtn");
+    const logoutBtn  = document.getElementById("logoutBtn");
+    const taskForm   = document.getElementById("taskForm");
+    const taskInput  = document.getElementById("taskInput");
+    const statusSel  = document.getElementById("statusSelect");
+    const addTaskBtn = document.getElementById("addTaskBtn");
+    const userDisplay= document.getElementById("userDisplay");
+    const accessDenied = document.getElementById("accessDenied");
 
+    // Drag helpers
+    const columns = ["backlog","inprogress","done"];
+    columns.forEach(colId => {
+      const col = document.getElementById(colId);
+      col.addEventListener("dragover", (e)=>{ e.preventDefault(); col.classList.add("dragover"); });
+      col.addEventListener("dragleave", ()=> col.classList.remove("dragover"));
+      col.addEventListener("drop", (e)=> handleDrop(e, colId));
+    });
+
+    // Auth
     loginBtn.onclick = async () => {
-      const provider = new GoogleAuthProvider();
-      try { await signInWithPopup(auth, provider); } 
-      catch (error) { console.error(error); alert("Google Sign-In failed."); }
+      try {
+        await signInWithPopup(auth, new GoogleAuthProvider());
+      } catch (e) {
+        console.error(e);
+        alert("Google Sign-In failed.");
+      }
     };
-
     logoutBtn.onclick = async () => { await signOut(auth); };
 
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
+    onAuthStateChanged(auth, (user)=>{
+      // Clean previous listeners
+      if (unsubscribeTasks){ unsubscribeTasks(); unsubscribeTasks = null; }
+
+      if (user){
         currentUser = user;
         loginBtn.style.display = "none";
         logoutBtn.style.display = "inline-block";
-        taskForm.style.display = "block";
+        taskForm.style.display = "flex";
         userDisplay.textContent = `Welcome, ${user.displayName || user.email}`;
-        accessDeniedMsg.style.display = "none";
-        loadTasks();
+        accessDenied.style.display = "none";
+        startTasksStream();
       } else {
         currentUser = null;
         loginBtn.style.display = "inline-block";
         logoutBtn.style.display = "none";
         taskForm.style.display = "none";
         userDisplay.textContent = "";
+        accessDenied.style.display = "none";
         clearColumns();
       }
     });
 
-    function clearColumns() {
-      ["backlog","inprogress","done"].forEach(id => {
-        document.getElementById(id).innerHTML = `<h3>${id.charAt(0).toUpperCase() + id.slice(1)}</h3>`;
-      });
-    }
-
-    async function loadTasks() {
-      clearColumns();
+    // Realtime tasks stream
+    function startTasksStream(){
       if (!currentUser) return;
-      try {
-        const q = query(collection(db, "tasks"), where("uid", "==", currentUser.uid));
-        const snapshot = await getDocs(q);
-        snapshot.forEach(docSnap => {
-          const task = docSnap.data();
-          const taskElement = document.createElement("div");
-          taskElement.className = "task";
-          taskElement.innerHTML = `
-            <button class="delete-task" onclick="deleteTask('${docSnap.id}')">X</button>
-            <strong>${task.text}</strong>
-          `;
-          document.getElementById(task.status).appendChild(taskElement);
+      const q = query(collection(db, "tasks"), where("uid","==", currentUser.uid));
+      try{
+        unsubscribeTasks = onSnapshot(q, (snap)=>{
+          clearColumns();
+          snap.forEach(docSnap => renderTask(docSnap.id, docSnap.data()));
+        }, (err)=>{
+          console.error("onSnapshot error:", err);
+          accessDenied.style.display = "block";
+          taskForm.style.display = "none";
         });
-      } catch (error) {
-        console.error(error);
-        accessDeniedMsg.style.display = "block";
+      }catch(err){
+        console.error(err);
+        accessDenied.style.display = "block";
         taskForm.style.display = "none";
       }
     }
 
-    window.addTask = async function() {
-      if (!currentUser) return;
-      const text = taskInput.value;
-      const status = statusSelect.value;
-      if (!text.trim()) return;
-      try {
-        await addDoc(collection(db,"tasks"), { uid: currentUser.uid, text, status });
-        taskInput.value = "";
-        loadTasks();
-      } catch (error) {
-        console.error(error);
-        accessDeniedMsg.style.display = "block";
-      }
-    };
+    // Clear board headers
+    function clearColumns(){
+      columns.forEach(id=>{
+        document.getElementById(id).innerHTML = `<h3>${id === "inprogress" ? "In Progress" : id.charAt(0).toUpperCase()+id.slice(1)}</h3>`;
+      });
+    }
 
-    window.deleteTask = async function(id) {
-      try {
-        await deleteDoc(doc(db,"tasks",id));
-        loadTasks();
-      } catch(error) {
-        console.error(error);
-        accessDeniedMsg.style.display = "block";
+    // Render a single task card
+    function renderTask(id, task){
+      const container = document.getElementById(task.status) || document.getElementById("backlog");
+      const card = document.createElement("div");
+      card.className = "task";
+      card.draggable = true;
+      card.dataset.id = id;
+      card.addEventListener("dragstart", handleDragStart);
+
+      card.innerHTML = `
+        <button class="delete-task" title="Delete">×</button>
+        <div class="task-title">${escapeHtml(task.text || "")}</div>
+        <div class="comments" id="comments-${id}"></div>
+        <div class="add-comment">
+          <input type="text" id="commentInput-${id}" placeholder="Add comment..." />
+          <button data-add-comment="${id}">Add</button>
+        </div>
+      `;
+
+      // Delete task
+      card.querySelector(".delete-task").addEventListener("click", ()=> deleteTask(id));
+
+      // Render comments
+      const commentsWrap = card.querySelector(`#comments-${cssId(id)}`);
+      (task.comments || []).forEach((c, idx)=>{
+        const row = document.createElement("div");
+        row.className = "comment";
+        row.innerHTML = `
+          <span>${escapeHtml(c)}</span>
+          <button class="delete-comment" title="Delete Comment" data-del-comment="${id}" data-idx="${idx}">×</button>
+        `;
+        commentsWrap.appendChild(row);
+      });
+
+      // Add comment
+      card.querySelector(`[data-add-comment="${cssId(id)}"]`).addEventListener("click", ()=>{
+        const input = card.querySelector(`#commentInput-${cssId(id)}`);
+        addComment(id, input.value.trim());
+        input.value = "";
+      });
+
+      // Delete comment (event delegation inside this card)
+      card.addEventListener("click", (e)=>{
+        const btn = e.target.closest("[data-del-comment]");
+        if (!btn) return;
+        const tid = btn.getAttribute("data-del-comment");
+        const idx = parseInt(btn.getAttribute("data-idx"), 10);
+        deleteComment(tid, idx);
+      });
+
+      container.appendChild(card);
+    }
+
+    // Add task
+    addTaskBtn.addEventListener("click", async ()=>{
+      if (!currentUser) return;
+      const text = taskInput.value.trim();
+      const status = statusSel.value;
+      if (!text) return;
+      try{
+        await addDoc(collection(db, "tasks"), {
+          uid: currentUser.uid,
+          text, status,
+          comments: []
+        });
+        taskInput.value = "";
+      }catch(err){
+        console.error(err);
+        accessDenied.style.display = "block";
       }
-    };
+    });
+
+    // Delete task
+    async function deleteTask(id){
+      try{
+        await deleteDoc(doc(db,"tasks", id));
+      }catch(err){
+        console.error(err);
+        accessDenied.style.display = "block";
+      }
+    }
+
+    // Add comment (arrayUnion)
+    async function addComment(taskId, commentText){
+      if (!commentText) return;
+      try{
+        await updateDoc(doc(db,"tasks", taskId), { comments: arrayUnion(commentText) });
+      }catch(err){
+        console.error(err);
+        accessDenied.style.display = "block";
+      }
+    }
+
+    // Delete comment by index (read-modify-write)
+    async function deleteComment(taskId, index){
+      try{
+        const ref = doc(db,"tasks", taskId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) return;
+        const data = snap.data();
+        const arr = Array.isArray(data.comments) ? [...data.comments] : [];
+        if (index < 0 || index >= arr.length) return;
+        arr.splice(index, 1);
+        await updateDoc(ref, { comments: arr });
+      }catch(err){
+        console.error(err);
+        accessDenied.style.display = "block";
+      }
+    }
+
+    // Drag handlers
+    function handleDragStart(e){
+      e.dataTransfer.setData("text/plain", e.currentTarget.dataset.id);
+    }
+    async function handleDrop(e, newStatus){
+      e.preventDefault();
+      const id = e.dataTransfer.getData("text/plain");
+      e.currentTarget.classList.remove("dragover");
+      if (!id) return;
+      try{
+        await updateDoc(doc(db,"tasks", id), { status: newStatus });
+      }catch(err){
+        console.error(err);
+        accessDenied.style.display = "block";
+      }
+    }
+
+    // Helpers
+    function escapeHtml(s=""){
+      return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+    function cssId(id){ return String(id).replace(/[^a-zA-Z0-9_-]/g,'_'); }
   </script>
 </body>
 </html>

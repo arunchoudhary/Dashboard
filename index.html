@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>To-Do Dashboard</title>
+  <title>To-Do Dashboard with Due Dates & Priority</title>
   <style>
     :root{
       --card-bg:#fff;
@@ -34,9 +34,14 @@
     .task{
       background:#fff; border:1px solid #e6e6e6; border-radius:10px; box-shadow:var(--shadow);
       padding:10px 10px 8px; margin:10px 0; position:relative; cursor:grab;
+      transition: background .2s ease;
     }
+    .task.overdue{ background:#f8d7da !important; }     /* Red */
+    .task.due-today{ background:#fff3cd !important; }   /* Amber */
     .task:active{ cursor:grabbing }
     .task-title{ font-weight:bold; padding-right:28px; word-break:break-word }
+    .task-meta{ font-size:.85em; margin-top:4px; color:#333; display:flex; justify-content:space-between; align-items:center; }
+    .priority-symbol{ font-size:1.1em; margin-left:6px; }
     .delete-task{
       position:absolute; top:6px; right:6px; background:#e53935; color:#fff; border:none;
       border-radius:6px; padding:0 6px; height:20px; line-height:20px; font-size:.7em; cursor:pointer;
@@ -59,7 +64,7 @@
       display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:10px 0 6px;
     }
     .add-task input, .add-task select{
-      padding:8px; border:1px solid #ccc; border-radius:10px; min-width:220px;
+      padding:8px; border:1px solid #ccc; border-radius:10px; min-width:150px;
     }
     .add-task button{
       padding:8px 14px; border:none; background:#2e7d32; color:#fff; border-radius:10px; cursor:pointer;
@@ -95,6 +100,12 @@
 
   <div class="add-task" id="taskForm" style="display:none;">
     <input type="text" id="taskInput" placeholder="Enter new task..." />
+    <input type="date" id="dueDateInput" />
+    <select id="prioritySelect">
+      <option value="low">Low</option>
+      <option value="medium">Medium</option>
+      <option value="high">High</option>
+    </select>
     <select id="statusSelect">
       <option value="backlog">Backlog</option>
       <option value="inprogress">In Progress</option>
@@ -109,7 +120,7 @@
     <div class="column" id="done"><h3>Done</h3></div>
   </div>
 
-  <!-- App (place at end so DOM exists) -->
+  <!-- App -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
     import {
@@ -126,7 +137,6 @@
     const auth = getAuth(app);
     const db   = getFirestore(app);
 
-    // State
     let currentUser = null;
     let unsubscribeTasks = null;
 
@@ -135,12 +145,13 @@
     const logoutBtn  = document.getElementById("logoutBtn");
     const taskForm   = document.getElementById("taskForm");
     const taskInput  = document.getElementById("taskInput");
+    const dueDateInput = document.getElementById("dueDateInput");
+    const prioritySel= document.getElementById("prioritySelect");
     const statusSel  = document.getElementById("statusSelect");
     const addTaskBtn = document.getElementById("addTaskBtn");
     const userDisplay= document.getElementById("userDisplay");
     const accessDenied = document.getElementById("accessDenied");
 
-    // Drag helpers
     const columns = ["backlog","inprogress","done"];
     columns.forEach(colId => {
       const col = document.getElementById(colId);
@@ -150,67 +161,42 @@
     });
 
     // Auth
-    loginBtn.onclick = async () => {
-      try {
-        await signInWithPopup(auth, new GoogleAuthProvider());
-      } catch (e) {
-        console.error(e);
-        alert("Google Sign-In failed.");
-      }
-    };
+    loginBtn.onclick = async () => { await signInWithPopup(auth, new GoogleAuthProvider()); };
     logoutBtn.onclick = async () => { await signOut(auth); };
 
     onAuthStateChanged(auth, (user)=>{
-      // Clean previous listeners
-      if (unsubscribeTasks){ unsubscribeTasks(); unsubscribeTasks = null; }
-
+      if (unsubscribeTasks){ unsubscribeTasks(); unsubscribeTasks=null; }
       if (user){
         currentUser = user;
-        loginBtn.style.display = "none";
-        logoutBtn.style.display = "inline-block";
-        taskForm.style.display = "flex";
+        loginBtn.style.display="none"; logoutBtn.style.display="inline-block"; taskForm.style.display="flex";
         userDisplay.textContent = `Welcome, ${user.displayName || user.email}`;
-        accessDenied.style.display = "none";
+        accessDenied.style.display="none";
         startTasksStream();
       } else {
-        currentUser = null;
-        loginBtn.style.display = "inline-block";
-        logoutBtn.style.display = "none";
-        taskForm.style.display = "none";
-        userDisplay.textContent = "";
-        accessDenied.style.display = "none";
-        clearColumns();
+        currentUser=null;
+        loginBtn.style.display="inline-block"; logoutBtn.style.display="none"; taskForm.style.display="none";
+        userDisplay.textContent=""; accessDenied.style.display="none"; clearColumns();
       }
     });
 
-    // Realtime tasks stream
     function startTasksStream(){
       if (!currentUser) return;
       const q = query(collection(db, "tasks"), where("uid","==", currentUser.uid));
-      try{
-        unsubscribeTasks = onSnapshot(q, (snap)=>{
-          clearColumns();
-          snap.forEach(docSnap => renderTask(docSnap.id, docSnap.data()));
-        }, (err)=>{
-          console.error("onSnapshot error:", err);
-          accessDenied.style.display = "block";
-          taskForm.style.display = "none";
-        });
-      }catch(err){
+      unsubscribeTasks = onSnapshot(q, (snap)=>{
+        clearColumns();
+        snap.forEach(docSnap => renderTask(docSnap.id, docSnap.data()));
+      }, (err)=>{
         console.error(err);
-        accessDenied.style.display = "block";
-        taskForm.style.display = "none";
-      }
-    }
-
-    // Clear board headers
-    function clearColumns(){
-      columns.forEach(id=>{
-        document.getElementById(id).innerHTML = `<h3>${id === "inprogress" ? "In Progress" : id.charAt(0).toUpperCase()+id.slice(1)}</h3>`;
+        accessDenied.style.display="block"; taskForm.style.display="none";
       });
     }
 
-    // Render a single task card
+    function clearColumns(){
+      columns.forEach(id=>{
+        document.getElementById(id).innerHTML = `<h3>${id==="inprogress"?"In Progress":id.charAt(0).toUpperCase()+id.slice(1)}</h3>`;
+      });
+    }
+
     function renderTask(id, task){
       const container = document.getElementById(task.status) || document.getElementById("backlog");
       const card = document.createElement("div");
@@ -219,128 +205,97 @@
       card.dataset.id = id;
       card.addEventListener("dragstart", handleDragStart);
 
+      // due date coloring
+      if (task.dueDate){
+        const today = new Date(); today.setHours(0,0,0,0);
+        const due = new Date(task.dueDate); due.setHours(0,0,0,0);
+        if (due < today){ card.classList.add("overdue"); }
+        else if (due.getTime()===today.getTime()){ card.classList.add("due-today"); }
+      }
+
+      const prioritySymbol = task.priority==="high"?"🔴":task.priority==="medium"?"🟠":"🟢";
+
       card.innerHTML = `
-        <button class="delete-task" title="Delete">×</button>
-        <div class="task-title">${escapeHtml(task.text || "")}</div>
-        <div class="comments" id="comments-${id}"></div>
+        <button class="delete-task">×</button>
+        <div class="task-title">${escapeHtml(task.text||"")}</div>
+        <div class="task-meta">
+          ${task.dueDate ? `Due: ${task.dueDate}`:""}
+          <span class="priority-symbol">${prioritySymbol}</span>
+        </div>
+        <div class="comments" id="comments-${cssId(id)}"></div>
         <div class="add-comment">
-          <input type="text" id="commentInput-${id}" placeholder="Add comment..." />
-          <button data-add-comment="${id}">Add</button>
+          <input type="text" id="commentInput-${cssId(id)}" placeholder="Add comment..." />
+          <button data-add-comment="${cssId(id)}">Add</button>
         </div>
       `;
+      card.querySelector(".delete-task").onclick=()=>deleteTask(id);
 
-      // Delete task
-      card.querySelector(".delete-task").addEventListener("click", ()=> deleteTask(id));
-
-      // Render comments
+      // comments
       const commentsWrap = card.querySelector(`#comments-${cssId(id)}`);
-      (task.comments || []).forEach((c, idx)=>{
-        const row = document.createElement("div");
-        row.className = "comment";
-        row.innerHTML = `
-          <span>${escapeHtml(c)}</span>
-          <button class="delete-comment" title="Delete Comment" data-del-comment="${id}" data-idx="${idx}">×</button>
-        `;
+      (task.comments||[]).forEach((c,idx)=>{
+        const row=document.createElement("div"); row.className="comment";
+        row.innerHTML=`<span>${escapeHtml(c)}</span><button class="delete-comment" data-del-comment="${id}" data-idx="${idx}">×</button>`;
         commentsWrap.appendChild(row);
       });
-
-      // Add comment
-      card.querySelector(`[data-add-comment="${cssId(id)}"]`).addEventListener("click", ()=>{
-        const input = card.querySelector(`#commentInput-${cssId(id)}`);
-        addComment(id, input.value.trim());
-        input.value = "";
-      });
-
-      // Delete comment (event delegation inside this card)
-      card.addEventListener("click", (e)=>{
-        const btn = e.target.closest("[data-del-comment]");
-        if (!btn) return;
-        const tid = btn.getAttribute("data-del-comment");
-        const idx = parseInt(btn.getAttribute("data-idx"), 10);
-        deleteComment(tid, idx);
+      card.querySelector(`[data-add-comment="${cssId(id)}"]`).onclick=()=>{
+        const input=card.querySelector(`#commentInput-${cssId(id)}`);
+        addComment(id,input.value.trim()); input.value="";
+      };
+      card.addEventListener("click",(e)=>{
+        const btn=e.target.closest("[data-del-comment]");
+        if (btn) deleteComment(btn.dataset.delComment, parseInt(btn.dataset.idx));
       });
 
       container.appendChild(card);
     }
 
-    // Add task
-    addTaskBtn.addEventListener("click", async ()=>{
-      if (!currentUser) return;
-      const text = taskInput.value.trim();
-      const status = statusSel.value;
-      if (!text) return;
+    addTaskBtn.onclick=async()=>{
+      if(!currentUser)return;
+      const text=taskInput.value.trim();
+      const status=statusSel.value;
+      const due=dueDateInput.value||null;
+      const priority=prioritySel.value||"low";
+      if(!text)return;
       try{
-        await addDoc(collection(db, "tasks"), {
-          uid: currentUser.uid,
-          text, status,
-          comments: []
+        await addDoc(collection(db,"tasks"),{
+          uid:currentUser.uid,text,status,
+          dueDate:due,
+          priority:priority,
+          comments:[]
         });
-        taskInput.value = "";
-      }catch(err){
-        console.error(err);
-        accessDenied.style.display = "block";
-      }
-    });
+        taskInput.value=""; dueDateInput.value="";
+      }catch(err){ console.error(err); accessDenied.style.display="block"; }
+    };
 
-    // Delete task
     async function deleteTask(id){
+      try{ await deleteDoc(doc(db,"tasks",id)); }
+      catch(err){ console.error(err); accessDenied.style.display="block"; }
+    }
+    async function addComment(taskId,text){
+      if(!text)return;
+      try{ await updateDoc(doc(db,"tasks",taskId),{comments:arrayUnion(text)}); }
+      catch(err){ console.error(err); accessDenied.style.display="block"; }
+    }
+    async function deleteComment(taskId,idx){
       try{
-        await deleteDoc(doc(db,"tasks", id));
-      }catch(err){
-        console.error(err);
-        accessDenied.style.display = "block";
-      }
+        const ref=doc(db,"tasks",taskId);
+        const snap=await getDoc(ref);
+        if(!snap.exists())return;
+        const arr=[...(snap.data().comments||[])];
+        arr.splice(idx,1);
+        await updateDoc(ref,{comments:arr});
+      }catch(err){ console.error(err); accessDenied.style.display="block"; }
     }
 
-    // Add comment (arrayUnion)
-    async function addComment(taskId, commentText){
-      if (!commentText) return;
-      try{
-        await updateDoc(doc(db,"tasks", taskId), { comments: arrayUnion(commentText) });
-      }catch(err){
-        console.error(err);
-        accessDenied.style.display = "block";
-      }
+    function handleDragStart(e){ e.dataTransfer.setData("text/plain", e.currentTarget.dataset.id); }
+    async function handleDrop(e,newStatus){
+      e.preventDefault(); e.currentTarget.classList.remove("dragover");
+      const id=e.dataTransfer.getData("text/plain"); if(!id)return;
+      try{ await updateDoc(doc(db,"tasks",id),{status:newStatus}); }
+      catch(err){ console.error(err); accessDenied.style.display="block"; }
     }
 
-    // Delete comment by index (read-modify-write)
-    async function deleteComment(taskId, index){
-      try{
-        const ref = doc(db,"tasks", taskId);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) return;
-        const data = snap.data();
-        const arr = Array.isArray(data.comments) ? [...data.comments] : [];
-        if (index < 0 || index >= arr.length) return;
-        arr.splice(index, 1);
-        await updateDoc(ref, { comments: arr });
-      }catch(err){
-        console.error(err);
-        accessDenied.style.display = "block";
-      }
-    }
-
-    // Drag handlers
-    function handleDragStart(e){
-      e.dataTransfer.setData("text/plain", e.currentTarget.dataset.id);
-    }
-    async function handleDrop(e, newStatus){
-      e.preventDefault();
-      const id = e.dataTransfer.getData("text/plain");
-      e.currentTarget.classList.remove("dragover");
-      if (!id) return;
-      try{
-        await updateDoc(doc(db,"tasks", id), { status: newStatus });
-      }catch(err){
-        console.error(err);
-        accessDenied.style.display = "block";
-      }
-    }
-
-    // Helpers
-    function escapeHtml(s=""){
-      return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    }
+    function escapeHtml(s=""){ return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
     function cssId(id){ return String(id).replace(/[^a-zA-Z0-9_-]/g,'_'); }
   </script>
 </body>

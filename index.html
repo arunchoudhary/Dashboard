@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>To-Do Dashboard with Due Dates & Priority</title>
+  <title>To-Do Dashboard with Editable Due Dates & Priority</title>
   <style>
     :root{
       --card-bg:#fff;
@@ -40,7 +40,7 @@
     .task.due-today{ background:#fff3cd !important; }   /* Amber */
     .task:active{ cursor:grabbing }
     .task-title{ font-weight:bold; padding-right:28px; word-break:break-word }
-    .task-meta{ font-size:.85em; margin-top:4px; color:#333; display:flex; justify-content:space-between; align-items:center; }
+    .task-meta{ font-size:.85em; margin-top:4px; color:#333; display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap }
     .priority-symbol{ font-size:1.1em; margin-left:6px; }
     .delete-task{
       position:absolute; top:6px; right:6px; background:#e53935; color:#fff; border:none;
@@ -64,7 +64,7 @@
       display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:10px 0 6px;
     }
     .add-task input, .add-task select{
-      padding:8px; border:1px solid #ccc; border-radius:10px; min-width:150px;
+      padding:8px; border:1px solid #ccc; border-radius:10px; min-width:120px;
     }
     .add-task button{
       padding:8px 14px; border:none; background:#2e7d32; color:#fff; border-radius:10px; cursor:pointer;
@@ -120,7 +120,6 @@
     <div class="column" id="done"><h3>Done</h3></div>
   </div>
 
-  <!-- App -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
     import {
@@ -132,7 +131,6 @@
     } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-firestore.js";
     import { firebaseConfig } from "./config.js";
 
-    // Init
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db   = getFirestore(app);
@@ -140,7 +138,6 @@
     let currentUser = null;
     let unsubscribeTasks = null;
 
-    // DOM
     const loginBtn   = document.getElementById("loginBtn");
     const logoutBtn  = document.getElementById("logoutBtn");
     const taskForm   = document.getElementById("taskForm");
@@ -160,7 +157,6 @@
       col.addEventListener("drop", (e)=> handleDrop(e, colId));
     });
 
-    // Auth
     loginBtn.onclick = async () => { await signInWithPopup(auth, new GoogleAuthProvider()); };
     logoutBtn.onclick = async () => { await signOut(auth); };
 
@@ -179,45 +175,27 @@
       }
     });
 
-     function startTasksStream(){
-  if (!currentUser) return;
-  const q = query(collection(db, "tasks"), where("uid","==", currentUser.uid));
-  unsubscribeTasks = onSnapshot(q, (snap)=>{
-    clearColumns();
+    function startTasksStream(){
+      if (!currentUser) return;
+      const q = query(collection(db, "tasks"), where("uid","==", currentUser.uid));
+      unsubscribeTasks = onSnapshot(q, (snap)=>{
+        clearColumns();
+        const tasks = [];
+        snap.forEach(docSnap => tasks.push({ id: docSnap.id, ...docSnap.data() }));
+        tasks.sort((a,b)=>{
+          const prioOrder={high:0,medium:1,low:2};
+          const pa=prioOrder[a.priority]??2; const pb=prioOrder[b.priority]??2;
+          if(pa!==pb) return pa-pb;
+          const da=a.dueDate?new Date(a.dueDate):null; const db_=b.dueDate?new Date(b.dueDate):null;
+          if(da && db_) return da-db_;
+          if(da && !db_) return -1;
+          if(!da && db_) return 1;
+          return (a.text||"").localeCompare(b.text||"");
+        });
+        tasks.forEach(task=>renderTask(task.id,task));
+      }, (err)=>{ console.error(err); accessDenied.style.display="block"; taskForm.style.display="none"; });
+    }
 
-    // Collect all tasks
-    const tasks = [];
-    snap.forEach(docSnap => {
-      tasks.push({ id: docSnap.id, ...docSnap.data() });
-    });
-
-    // Sort tasks before rendering
-    tasks.sort((a, b) => {
-      const prioOrder = { high: 0, medium: 1, low: 2 };
-      const pa = prioOrder[a.priority] ?? 2;
-      const pb = prioOrder[b.priority] ?? 2;
-
-      if (pa !== pb) return pa - pb; // Priority first
-
-      const da = a.dueDate ? new Date(a.dueDate) : null;
-      const db = b.dueDate ? new Date(b.dueDate) : null;
-
-      if (da && db) return da - db;   // Earlier due date first
-      if (da && !db) return -1;       // With date before no date
-      if (!da && db) return 1;
-
-      return (a.text || "").localeCompare(b.text || ""); // Alphabetical fallback
-    });
-
-    // Render tasks
-    tasks.forEach(task => renderTask(task.id, task));
-  }, (err)=>{
-    console.error(err);
-    accessDenied.style.display="block";
-    taskForm.style.display="none";
-  });
-}
-    
     function clearColumns(){
       columns.forEach(id=>{
         document.getElementById(id).innerHTML = `<h3>${id==="inprogress"?"In Progress":id.charAt(0).toUpperCase()+id.slice(1)}</h3>`;
@@ -232,22 +210,32 @@
       card.dataset.id = id;
       card.addEventListener("dragstart", handleDragStart);
 
-      // due date coloring
-      if (task.dueDate){
-        const today = new Date(); today.setHours(0,0,0,0);
-        const due = new Date(task.dueDate); due.setHours(0,0,0,0);
-        if (due < today){ card.classList.add("overdue"); }
-        else if (due.getTime()===today.getTime()){ card.classList.add("due-today"); }
+      function updateCardColor(dueDate){
+        card.classList.remove("overdue","due-today");
+        if(dueDate){
+          const today = new Date(); today.setHours(0,0,0,0);
+          const due = new Date(dueDate); due.setHours(0,0,0,0);
+          if(due < today) card.classList.add("overdue");
+          else if(due.getTime()===today.getTime()) card.classList.add("due-today");
+        }
       }
+      updateCardColor(task.dueDate);
 
-      const prioritySymbol = task.priority==="high"?"🔴":task.priority==="medium"?"🟠":"🟢";
+      function getPrioritySymbol(priority){
+        return priority==="high"?"🔴":priority==="medium"?"🟠":"🟢";
+      }
 
       card.innerHTML = `
         <button class="delete-task">×</button>
         <div class="task-title">${escapeHtml(task.text||"")}</div>
         <div class="task-meta">
-          ${task.dueDate ? `Due: ${task.dueDate}`:""}
-          <span class="priority-symbol">${prioritySymbol}</span>
+          Due: <input type="date" class="task-due" value="${task.dueDate||""}" />
+          Priority: <select class="task-priority">
+            <option value="low" ${task.priority==="low"?"selected":""}>Low</option>
+            <option value="medium" ${task.priority==="medium"?"selected":""}>Medium</option>
+            <option value="high" ${task.priority==="high"?"selected":""}>High</option>
+          </select>
+          <span class="priority-symbol">${getPrioritySymbol(task.priority)}</span>
         </div>
         <div class="comments" id="comments-${cssId(id)}"></div>
         <div class="add-comment">
@@ -255,9 +243,22 @@
           <button data-add-comment="${cssId(id)}">Add</button>
         </div>
       `;
-      card.querySelector(".delete-task").onclick=()=>deleteTask(id);
 
-      // comments
+      card.querySelector(".delete-task").onclick = ()=> deleteTask(id);
+
+      card.querySelector(".task-due").onchange = async (e)=>{
+        const newDate = e.target.value||null;
+        try{ await updateDoc(doc(db,"tasks",id),{dueDate:newDate}); updateCardColor(newDate); }
+        catch(err){ console.error(err); accessDenied.style.display="block"; }
+      };
+
+      card.querySelector(".task-priority").onchange = async (e)=>{
+        const newPriority = e.target.value;
+        try{ await updateDoc(doc(db,"tasks",id),{priority:newPriority});
+        card.querySelector(".priority-symbol").textContent = getPrioritySymbol(newPriority);
+        }catch(err){ console.error(err); accessDenied.style.display="block"; }
+      };
+
       const commentsWrap = card.querySelector(`#comments-${cssId(id)}`);
       (task.comments||[]).forEach((c,idx)=>{
         const row=document.createElement("div"); row.className="comment";
@@ -270,7 +271,7 @@
       };
       card.addEventListener("click",(e)=>{
         const btn=e.target.closest("[data-del-comment]");
-        if (btn) deleteComment(btn.dataset.delComment, parseInt(btn.dataset.idx));
+        if(btn) deleteComment(btn.dataset.delComment,parseInt(btn.dataset.idx));
       });
 
       container.appendChild(card);
@@ -285,10 +286,7 @@
       if(!text)return;
       try{
         await addDoc(collection(db,"tasks"),{
-          uid:currentUser.uid,text,status,
-          dueDate:due,
-          priority:priority,
-          comments:[]
+          uid:currentUser.uid,text,status,dueDate:due,priority:priority,comments:[]
         });
         taskInput.value=""; dueDateInput.value="";
       }catch(err){ console.error(err); accessDenied.style.display="block"; }

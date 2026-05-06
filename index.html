@@ -3,18 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Dashboard + Time Tracker</title>
+<title>Dashboard + Tracker</title>
 
 <style>
-body { font-family: Arial; margin:0; background:#f4f6f9; }
-h2 { text-align:center; }
+body { font-family: Arial; background:#f4f6f9; margin:0; padding:20px; }
 
-.tabs {
-  display:flex;
-  justify-content:center;
-  gap:10px;
-  margin:10px;
-}
+/* Tabs */
+.tabs { display:flex; justify-content:center; gap:10px; margin-bottom:15px; }
 .tabs button {
   padding:10px 16px;
   border:none;
@@ -22,15 +17,14 @@ h2 { text-align:center; }
   cursor:pointer;
   background:#ddd;
 }
-.tabs button.active { background:#1976d2; color:#fff; }
+.tabs button.active { background:#1976d2; color:white; }
 
-.tab { display:none; padding:10px; }
+.tab { display:none; }
 .tab.active { display:block; }
 
-/* reuse your styles (shortened) */
-.column { background:#fff; padding:10px; border-radius:10px; margin:10px; flex:1; }
+/* Your existing styles simplified */
+.column { background:#fff; padding:10px; border-radius:10px; margin:10px; }
 .board { display:flex; gap:10px; flex-wrap:wrap; }
-
 .task {
   background:#fff;
   border:1px solid #ddd;
@@ -39,35 +33,27 @@ h2 { text-align:center; }
   border-radius:8px;
 }
 
-/* timer */
-.task-timer {
-  display:flex;
-  justify-content:space-between;
-  margin-top:6px;
+/* Tracker */
+.tracker-task {
+  background:#fff;
+  padding:10px;
+  margin:10px 0;
+  border-radius:8px;
 }
-.task-timer button {
-  border:none;
-  padding:4px 8px;
-  border-radius:6px;
-  cursor:pointer;
-}
-.start-btn { background:#2e7d32; color:#fff; }
-.stop-btn { background:#c62828; color:#fff; }
-
 </style>
 </head>
 
 <body>
 
-<h2>Productivity Dashboard</h2>
+<h2>Task Dashboard</h2>
 
 <div class="tabs">
-  <button class="active" onclick="showTab('todo')">To-Do</button>
-  <button onclick="showTab('tracker')">Time Tracker</button>
+  <button class="active" onclick="showTab('todoTab', this)">To-Do</button>
+  <button onclick="showTab('trackerTab', this)">Time Tracker</button>
 </div>
 
 <!-- ================= TO DO TAB ================= -->
-<div id="todo" class="tab active">
+<div id="todoTab" class="tab active">
 
 <div style="text-align:center;">
   <button id="loginBtn">Login</button>
@@ -88,18 +74,17 @@ h2 { text-align:center; }
 </div>
 
 <!-- ================= TRACKER TAB ================= -->
-<div id="tracker" class="tab">
+<div id="trackerTab" class="tab">
 
 <div style="text-align:center;">
   <input id="trackerInput" placeholder="New task"/>
-  <button onclick="tracker.add()">Add</button>
+  <button id="trackerAddBtn">Add</button>
 </div>
 
 <div id="trackerList"></div>
 
 </div>
 
-<!-- ================= SCRIPT ================= -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
 import {
@@ -116,127 +101,118 @@ import {
 
 import { firebaseConfig } from "./config.js";
 
-/* ================= INIT ================= */
+/* INIT */
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let user = null;
+let currentUser = null;
 
-/* ================= TABS ================= */
-window.showTab = (id) => {
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+/* TABS */
+window.showTab = (id, btn) => {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+
   document.getElementById(id).classList.add("active");
-  event.target.classList.add("active");
+  btn.classList.add("active");
 };
 
-/* ================= AUTH ================= */
+/* AUTH */
 loginBtn.onclick = ()=> signInWithPopup(auth,new GoogleAuthProvider());
 logoutBtn.onclick = ()=> signOut(auth);
 
-onAuthStateChanged(auth,(u)=>{
-  user=u;
-  loginBtn.style.display=u?"none":"inline";
-  logoutBtn.style.display=u?"inline":"none";
-  taskForm.style.display=u?"block":"none";
+onAuthStateChanged(auth,(user)=>{
+  currentUser=user;
 
-  if(u){
-    todo.init();
-    tracker.init();
+  loginBtn.style.display=user?"none":"inline";
+  logoutBtn.style.display=user?"inline":"none";
+  taskForm.style.display=user?"block":"none";
+
+  if(user){
+    startTodo();
+    startTracker();
+  } else {
+    clearTodo();
+    trackerList.innerHTML="";
   }
 });
 
-/* =====================================================
-   🧩 MODULE 1: TO DO (your existing simplified logic)
-===================================================== */
-const todo = (()=>{
+/* ================= TO DO ================= */
+function startTodo(){
+  const q = query(collection(db,"tasks"), where("uid","==",currentUser.uid));
 
-let unsub=null;
-
-function init(){
-  if(unsub) unsub();
-
-  const q = query(collection(db,"tasks"), where("uid","==",user.uid));
-  unsub = onSnapshot(q,(snap)=>{
-    ["backlog","inprogress","done"].forEach(id=>{
-      document.getElementById(id).innerHTML=`<h3>${id}</h3>`;
-    });
+  onSnapshot(q,(snap)=>{
+    clearTodo();
 
     snap.forEach(d=>{
       const t={id:d.id,...d.data()};
-      render(t);
+      renderTask(t);
     });
   });
 }
 
-function render(task){
+function clearTodo(){
+  ["backlog","inprogress","done"].forEach(id=>{
+    document.getElementById(id).innerHTML=`<h3>${id}</h3>`;
+  });
+}
+
+function renderTask(task){
   const col=document.getElementById(task.status||"backlog");
 
   const div=document.createElement("div");
   div.className="task";
 
   div.innerHTML=`
-    <b>${task.text}</b>
-    <br/>
-    <button onclick="todo.move('${task.id}','backlog')">B</button>
-    <button onclick="todo.move('${task.id}','inprogress')">P</button>
-    <button onclick="todo.move('${task.id}','done')">D</button>
-    <button onclick="todo.del('${task.id}')">X</button>
+    <b>${task.text}</b><br/>
+    <button onclick="moveTask('${task.id}','backlog')">B</button>
+    <button onclick="moveTask('${task.id}','inprogress')">P</button>
+    <button onclick="moveTask('${task.id}','done')">D</button>
+    <button onclick="deleteTask('${task.id}')">X</button>
   `;
 
   col.appendChild(div);
 }
 
-async function add(){
+window.moveTask = async (id,status)=>{
+  await updateDoc(doc(db,"tasks",id),{status});
+};
+
+window.deleteTask = async (id)=>{
+  await deleteDoc(doc(db,"tasks",id));
+};
+
+addTaskBtn.onclick = async ()=>{
   const text=taskInput.value.trim();
   if(!text) return;
 
   await addDoc(collection(db,"tasks"),{
-    uid:user.uid,
+    uid:currentUser.uid,
     text,
     status:"backlog"
   });
 
   taskInput.value="";
-}
+};
 
-async function move(id,status){
-  await updateDoc(doc(db,"tasks",id),{status});
-}
+/* ================= TRACKER ================= */
+let trackerTasks=[];
 
-async function del(id){
-  await deleteDoc(doc(db,"tasks",id));
-}
-
-addTaskBtn.onclick=add;
-
-return { init, move, del };
-
-})();
-
-/* =====================================================
-   🧩 MODULE 2: TIME TRACKER (clean reusable)
-===================================================== */
-const tracker = (()=>{
-
-let tasks=[];
-
-function init(){
-  const q=query(collection(db,"tracker"),where("uid","==",user.uid));
+function startTracker(){
+  const q = query(collection(db,"tracker"), where("uid","==",currentUser.uid));
 
   onSnapshot(q,(snap)=>{
-    tasks=snap.docs.map(d=>({id:d.id,...d.data()}));
-    render();
+    trackerTasks=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderTracker();
   });
 }
 
-async function add(){
-  const name=document.getElementById("trackerInput").value.trim();
+trackerAddBtn.onclick = async ()=>{
+  const name=trackerInput.value.trim();
   if(!name) return;
 
   await addDoc(collection(db,"tracker"),{
-    uid:user.uid,
+    uid:currentUser.uid,
     name,
     total:0,
     isActive:false,
@@ -244,12 +220,12 @@ async function add(){
   });
 
   trackerInput.value="";
-}
+};
 
-async function start(id){
+window.startTracker = async (id)=>{
   const now=Date.now();
 
-  const snap=await getDocs(query(collection(db,"tracker"),where("uid","==",user.uid)));
+  const snap=await getDocs(query(collection(db,"tracker"),where("uid","==",currentUser.uid)));
 
   for(const d of snap.docs){
     const t=d.data();
@@ -265,54 +241,45 @@ async function start(id){
     isActive:true,
     lastStart:now
   });
-}
+};
 
-async function stop(t){
-  if(!t.isActive) return;
+window.stopTracker = async (task)=>{
+  if(!task.isActive) return;
 
   const now=Date.now();
 
-  await updateDoc(doc(db,"tracker",t.id),{
+  await updateDoc(doc(db,"tracker",task.id),{
     isActive:false,
-    total:(t.total||0)+(now-t.lastStart)
+    total:(task.total||0)+(now-task.lastStart)
   });
-}
+};
 
-function render(){
-  const el=document.getElementById("trackerList");
-  el.innerHTML="";
+function renderTracker(){
+  trackerList.innerHTML="";
 
-  tasks.forEach(t=>{
+  trackerTasks.forEach(t=>{
+    let time=t.total||0;
+    if(t.isActive) time+=Date.now()-t.lastStart;
+
     const div=document.createElement("div");
-    div.className="task";
-
-    const time = calc(t);
+    div.className="tracker-task";
 
     div.innerHTML=`
       <b>${t.name}</b>
-      <div class="task-timer">
-        <span>${format(time)}</span>
+      <div style="display:flex; justify-content:space-between;">
+        <span>${formatTime(time)}</span>
         <div>
-          <button class="start-btn">▶️</button>
-          <button class="stop-btn">⏹</button>
+          <button onclick="startTracker('${t.id}')">▶️</button>
+          <button onclick='stopTracker(${JSON.stringify(t)})'>⏹</button>
         </div>
       </div>
     `;
 
-    div.querySelector(".start-btn").onclick=()=>start(t.id);
-    div.querySelector(".stop-btn").onclick=()=>stop(t);
-
-    el.appendChild(div);
+    trackerList.appendChild(div);
   });
 }
 
-function calc(t){
-  let time=t.total||0;
-  if(t.isActive) time+=Date.now()-t.lastStart;
-  return time;
-}
-
-function format(ms){
+function formatTime(ms){
   const s=Math.floor(ms/1000);
   const h=Math.floor(s/3600);
   const m=Math.floor((s%3600)/60);
@@ -320,11 +287,7 @@ function format(ms){
   return `${h}h ${m}m ${sec}s`;
 }
 
-setInterval(render,1000);
-
-return { init, add };
-
-})();
+setInterval(renderTracker,1000);
 
 </script>
 </body>
